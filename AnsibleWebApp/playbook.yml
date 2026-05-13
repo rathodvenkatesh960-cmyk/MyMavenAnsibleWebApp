@@ -1,4 +1,38 @@
+- name: Deploy to Tomcat
+  hosts: web
+  become: yes
 
+  vars:
+    war_file: MavenAnsibleWebApp1.war
+    tomcat_webapps: /opt/tomcat/webapps
+
+  tasks:
+
+    - name: Copy WAR file to Tomcat webapps directory
+      ansible.builtin.copy:
+        src: "../target/{{ war_file }}"
+        dest: "{{ tomcat_webapps }}/{{ war_file }}"
+        mode: '0644'
+
+    - name: Check if systemd Tomcat exists
+      ansible.builtin.command: systemctl status tomcat9
+      register: tomcat_systemd
+      ignore_errors: yes
+
+    - name: Restart Tomcat using systemd (if exists)
+      ansible.builtin.systemd:
+        name: tomcat9
+        state: restarted
+      when: tomcat_systemd.rc == 0
+
+    - name: Restart Tomcat manually (if systemd not found)
+      ansible.builtin.shell: |
+        if [ -f /opt/tomcat/bin/shutdown.sh ]; then
+          /opt/tomcat/bin/shutdown.sh
+          sleep 5
+          /opt/tomcat/bin/startup.sh
+        fi
+      when: tomcat_systemd.rc != 0
 
 - name: Deploy to Tomcat
   hosts: web
